@@ -107,12 +107,16 @@ func TestServer(t *testing.T) {
 		}
 	}
 
-	event := Event{"test", Running}
-	data, _ := json.Marshal(event)
-	testSend(true, true, data, &event)
+	statuses := []string{Running, Stopped, Failed}
 
-	event = Event{"test", "invalid"}
-	data, _ = json.Marshal(event)
+	for _, status := range statuses {
+		event := Event{"test", status}
+		data, _ := json.Marshal(event)
+		testSend(true, true, data, &event)
+	}
+
+	event := Event{"test", "invalid"}
+	data, _ := json.Marshal(event)
 	testSend(true, false, data, nil)
 
 	data = []byte("this is not json")

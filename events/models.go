@@ -6,8 +6,12 @@ import (
 )
 
 const (
+	// Event Status Values
 	Running string = "running"
 	Stopped string = "stopped"
+	Failed string = "failed"
+
+	// Result Status Values
 	Success string = "success"
 	Failure string = "failure"
 )
@@ -34,7 +38,7 @@ func (event Event) Validate() error {
 		return errors.New("event has no process value")
 	case event.Status == "":
 		return errors.New("event has no status value")
-	case event.Status != Running && event.Status != Stopped:
+	case event.Status != Running && event.Status != Stopped && event.Status != Failed:
 		return errors.New("event has invalid status value")
 	default:
 		return nil

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	// Event Status Values
+	// Process State Values
 	Running string = "running"
 	Stopped string = "stopped"
 	Failed string = "failed"
@@ -19,15 +19,15 @@ const (
 // Event is sent by the client to update a process status.
 type Event struct {
 	Process string `json:"process"`
-	Status  string `json:"status"`
+	State   string `json:"state"`
 }
 
 // String returns the string representation of the Event.
 func (event Event) String() string {
-	if event.Process == "" && event.Status == "" {
+	if event.Process == "" && event.State == "" {
 		return "Event{}"
 	} else {
-		return fmt.Sprintf(`Event{"%s", "%s"}`, event.Process, event.Status)
+		return fmt.Sprintf(`Event{"%s", "%s"}`, event.Process, event.State)
 	}
 }
 
@@ -36,10 +36,10 @@ func (event Event) Validate() error {
 	switch {
 	case event.Process == "":
 		return errors.New("event has no process value")
-	case event.Status == "":
-		return errors.New("event has no status value")
-	case event.Status != Running && event.Status != Stopped && event.Status != Failed:
-		return errors.New("event has invalid status value")
+	case event.State == "":
+		return errors.New("event has no state value")
+	case event.State != Running && event.State != Stopped && event.State != Failed:
+		return errors.New("event has invalid state value")
 	default:
 		return nil
 	}

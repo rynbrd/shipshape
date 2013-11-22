@@ -1,66 +1,98 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"io"
+	"syscall"
+	"go-supervisor/supervisor"
 	"os"
 	"runtime"
 	"shipshape/events"
-	"supervisor"
+	"os/signal"
 )
 
-func Print(format string, params ...interface{}) {
-	fmt.Fprintf(os.Stderr, format+"\n", params...)
+func getState(process *supervisor.Process) string {
+	switch process.State {
+	case supervisor.Running:
+		return events.Running
+	case supervisor.Stopped:
+		return events.Stopped
+	case supervisor.Exited:
+		fallthrough
+	case supervisor.Fatal:
+		return events.Failed
+	}
+	return ""
 }
 
-func Info(format string, params ...interface{}) {
-	fmt.Fprintf(os.Stderr, "INFO: "+format+"\n", params...)
-}
+func Run(config *Config) {
+	done := make(chan bool)
+	monitorEvents := make(chan interface{}, config.MonitorQueueSize)
+	monitor, err := supervisor.NewMonitor(config.SupervisorUrl, config.InStream, config.OutStream, monitorEvents)
+	if err != nil {
+		Fatal(err, 1)
+	}
 
-func Error(format string, params ...interface{}) {
-	fmt.Fprintf(os.Stderr, "ERROR: "+format+"\n", params...)
-}
+	eventClient := events.NewClient(config.GreaserUrl)
 
-func run(in io.Reader, out io.Writer, url string) (err error) {
-	ch := make(chan *supervisor.Event)
-	go func() {
-		defer func() {
-			close(ch)
-		}()
-
-		err := supervisor.Listen(in, out, ch)
-		if err != nil {
-			Error(err.Error())
-		}
-	}()
-
-	var shipev *events.Event
-	var superev *supervisor.Event
-	client := events.NewClient(url)
-	for {
-		superev = <-ch
-		switch {
-		case superev.Name() == "PROCESS_STATE_RUNNING":
-			shipev = &events.Event{superev.Meta["processname"], events.Running}
-		case superev.Name()[:14] == "PROCESS_STATE_":
-			shipev = &events.Event{superev.Meta["processname"], events.Stopped}
-		default:
-			continue
-		}
-
-		Info("Sending %s to %v\n", shipev, client.Url)
-		err := client.Send(shipev)
-		if err != nil {
-			Error(err.Error())
+	send := func(name string, state string) {
+		Debug("%s -> %s", name, state)
+		if err := eventClient.Send(&events.Event{name, state}); err != nil {
+			Error(err)
 		}
 	}
+
+	shutdown := func() {
+		for _, process := range monitor.Processes {
+			if getState(process) != events.Stopped {
+				send(process.Name, events.Stopped)
+			}
+		}
+		Info("Exiting.")
+		os.Exit(0)
+	}
+
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGINT)
+	signal.Notify(sigchan, syscall.SIGTERM)
+	go func() {
+		signal := <-sigchan
+		Info("Received signal: %s", signal)
+		shutdown()
+	}()
+
+	go func() {
+		var process supervisor.Process
+		var state string
+
+		for event := range monitorEvents {
+			switch event.(type) {
+			case supervisor.ProcessAddEvent:
+				process = (event.(supervisor.ProcessAddEvent)).Process
+			case supervisor.ProcessRemoveEvent:
+				process = (event.(supervisor.ProcessRemoveEvent)).Process
+			case supervisor.ProcessStateEvent:
+				process = (event.(supervisor.ProcessStateEvent)).Process
+			default:
+				continue
+			}
+
+			if state = getState(&process); state != "" {
+				send(process.Name, state)
+			}
+		}
+		done <- true
+	}()
+
+	if err = monitor.Run(); err != nil {
+		Fatal(err, 1)
+	}
+
+	<-done
+	Info("Monitor completed.")
+	shutdown()
 }
 
 func main() {
 	runtime.GOMAXPROCS(2)
-
-	urlp := flag.String("url", "http://127.0.0.1:5009/event", "URL to send events to.")
-	flag.Parse()
-	run(os.Stdin, os.Stdout, *urlp)
+	config := LoadConfig()
+	Run(&config)
 }

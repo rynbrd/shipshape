@@ -1,10 +1,10 @@
 package main
 
 import (
-	"supervisor"
+	"go-supervisor/supervisor"
+	"io"
 	"net/http"
 	"shipshape/events"
-	"io"
 	"strconv"
 	"testing"
 )
@@ -27,9 +27,17 @@ func TestOiler(t *testing.T) {
 		http.ListenAndServe("127.0.0.1:5009", nil)
 	}()
 
-	go run(stdin, stdout, "http://127.0.0.1:5009/event")
+	config := Config {
+		DefaultGreaserUrl,
+		DefaultSupervisorUrl,
+		stdin,
+		stdout,
+		DefaultMonitorQueueSize,
+	}
 
-	sendAndVerify := func(eventname string, meta map[string]string, payload []byte, status string) {
+	go Run(&config)
+
+	sendAndVerify := func(eventname string, meta map[string]string, payload []byte, state string) {
 		serialstr := strconv.Itoa(serial)
 		sentEvent := supervisor.Event{
 			map[string]string{
@@ -60,14 +68,14 @@ func TestOiler(t *testing.T) {
 			t.Errorf(`supervisor.ReadResult() => "%s", want "OK"`, result)
 		}
 
-		if status == "" {
+		if state == "" {
 			return
 		}
 
 		if receivedEvent, ok := <-ch; !ok {
 			t.Errorf(`(event, ok := <-ch) => channel closed, want event`)
-		} else if receivedEvent.Status != status {
-			t.Errorf(`(event, ok := <-ch) => got status="%s", want status="%s"`, receivedEvent.Status, status)
+		} else if receivedEvent.State != state {
+			t.Errorf(`(event, ok := <-ch) => got state="%s", want state="%s"`, receivedEvent.State, state)
 		}
 	}
 
@@ -81,4 +89,7 @@ func TestOiler(t *testing.T) {
 
 	meta = map[string]string{"from_state": "RUNNING"}
 	sendAndVerify("PROCESS_STATE_STOPPED", meta, []byte{}, events.Stopped)
+
+	meta = map[string]string{"from_state": "RUNNING"}
+	sendAndVerify("PROCESS_STATE_FATAL", meta, []byte{}, events.Failed)
 }

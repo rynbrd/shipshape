@@ -1,24 +1,24 @@
 package main
 
 import (
-	"syscall"
+	"../event"
 	"go-supervisor/supervisor"
 	"os"
-	"runtime"
-	"shipshape/events"
 	"os/signal"
+	"runtime"
+	"syscall"
 )
 
 func getState(process *supervisor.Process) string {
 	switch process.State {
 	case supervisor.Running:
-		return events.Running
+		return event.Running
 	case supervisor.Stopped:
-		return events.Stopped
+		return event.Stopped
 	case supervisor.Exited:
 		fallthrough
 	case supervisor.Fatal:
-		return events.Failed
+		return event.Failed
 	}
 	return ""
 }
@@ -31,19 +31,19 @@ func Run(config *Config) {
 		Fatal(err, 1)
 	}
 
-	eventClient := events.NewClient(config.GreaserUrl)
+	eventClient := event.NewClient(config.GreaserUrl)
 
 	send := func(name string, state string) {
 		Debug("%s -> %s", name, state)
-		if err := eventClient.Send(&events.Event{name, state}); err != nil {
+		if err := eventClient.Send(&event.Event{name, state}); err != nil {
 			Error(err)
 		}
 	}
 
 	shutdown := func() {
 		for _, process := range monitor.Processes {
-			if getState(process) != events.Stopped {
-				send(process.Name, events.Stopped)
+			if getState(process) != event.Stopped {
+				send(process.Name, event.Stopped)
 			}
 		}
 		Info("Exiting.")

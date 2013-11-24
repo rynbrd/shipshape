@@ -13,7 +13,9 @@ type Service struct {
 	Command     []string
 	Ports       []Port
 	Templates   []Template
-	Metadata    map[string]string
+	Dir         string
+	Env         map[string]string
+	Metadata    map[interface{}]interface{}
 	StopSignal  syscall.Signal
 	StopTimeout time.Duration
 	StdoutDest  string
@@ -25,9 +27,15 @@ type Service struct {
 
 // SetYAML parses the YAML tree into the configuration object.
 func (s *Service) SetYAML(tag string, data interface{}) bool {
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic("failed to get current working directory")
+	}
+
 	AssertIsMap("service", data)
 	AssertHasKeys(data, []string{"command"}, "service")
 	s.Command = GetStringArray(data, "command", nil)
+	s.Dir = GetString(data, "dir", cwd)
 	s.StopSignal = GetSignal(data, "stop-signal", DefaultServiceStopSignal)
 	s.StopTimeout = GetDuration(data, "stop-timeout", DefaultServiceStopTimeout)
 	s.StdoutDest = GetString(data, "stdout-dest", DefaultServiceStdoutDest)
@@ -35,6 +43,21 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 	s.Restart = GetBool(data, "restart", DefaultServiceRestart)
 	s.Retries = GetInt(data, "retries", DefaultServiceRetries)
 	s.ExitCode = GetInt(data, "exit-code", DefaultServiceExitCode)
+
+	if values, ok := GetMapItem(data, "env"); ok {
+		AssertIsMap("env", values)
+		s.Metadata = values.(map[interface{}]interface{})
+	} else {
+		s.Metadata = make(map[interface{}]interface{})
+	}
+
+	s.Env = make(map[string]string)
+	if values, ok := GetMapItem(data, "env"); ok {
+		AssertIsStringMap("env", values)
+		for name, value := range values.(map[interface{}]interface{}) {
+			s.Env[name.(string)] = value.(string)
+		}
+	}
 
 	if values, ok := GetMapItem(data, "ports"); ok {
 		AssertIsArray("ports", values)

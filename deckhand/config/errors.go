@@ -39,18 +39,14 @@ func AssertHasKeys(data interface{}, keys []string, where string) {
 
 // AssertIsBool panics with a ParseError if value is not a boolean.
 func AssertIsBool(key string, value interface{}) {
-	switch value.(type) {
-	case bool:
-	default:
+	if _, ok := value.(bool); !ok {
 		panic(NewParseError(key, value, "bool"))
 	}
 }
 
 // AssertIsString panics with a ParseError if value is not a string.
 func AssertIsString(key string, value interface{}) {
-	switch value.(type) {
-	case string:
-	default:
+	if _, ok := value.(string); !ok {
 		panic(NewParseError(key, value, "string"))
 	}
 }
@@ -66,9 +62,7 @@ func AssertIsInt(key string, value interface{}) {
 
 // AssertIsArray panics with a ParseError if value is not an array.
 func AssertIsArray(key string, value interface{}) {
-	switch value.(type) {
-	case []interface{}:
-	default:
+	if _, ok := value.([]interface{}); !ok {
 		panic(NewParseError(key, value, "array"))
 	}
 }
@@ -77,9 +71,7 @@ func AssertIsArray(key string, value interface{}) {
 func AssertIsStringArray(key string, value interface{}) {
 	AssertIsArray(key, value)
 	for _, item := range value.([]interface{}) {
-		switch item.(type) {
-		case string:
-		default:
+		if _, ok := item.(string); !ok {
 			panic(NewParseError(key, value, "string array"))
 		}
 	}
@@ -87,9 +79,20 @@ func AssertIsStringArray(key string, value interface{}) {
 
 // AssertIsMap panics with a ParseError if value is not a map.
 func AssertIsMap(key string, value interface{}) {
-	switch value.(type) {
-	case map[interface{}]interface{}:
-	default:
+	if _, ok := value.(map[interface{}]interface{}); !ok {
 		panic(NewParseError(key, value, "map"))
+	}
+}
+
+// AssertIsStringMap panics with a ParseError if value is not a string/string map.
+func AssertIsStringMap(key string, value interface{}) {
+	AssertIsMap(key, value)
+	for name, item := range value.(map[interface{}]interface{}) {
+		if _, ok := name.(string); !ok {
+			panic(NewParseError(key, value, "map key"))
+		}
+		if _, ok := item.(string); !ok {
+			panic(NewParseError(key, value, "map value"))
+		}
 	}
 }

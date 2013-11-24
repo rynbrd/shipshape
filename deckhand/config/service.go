@@ -39,10 +39,16 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 	s.StopSignal = GetSignal(data, "stop-signal", DefaultServiceStopSignal)
 	s.StopTimeout = GetDuration(data, "stop-timeout", DefaultServiceStopTimeout)
 	s.StdoutDest = GetString(data, "stdout-dest", DefaultServiceStdoutDest)
-	s.StderrDest = GetString(data, "stderr-dest", DefaultServiceStderrDest)
 	s.Restart = GetBool(data, "restart", DefaultServiceRestart)
 	s.Retries = GetInt(data, "retries", DefaultServiceRetries)
 	s.ExitCode = GetInt(data, "exit-code", DefaultServiceExitCode)
+
+	stderrDest := GetString(data, "stderr-dest", DefaultServiceStderrDest)
+	if strings.Trim(strings.ToUpper(stderrDest)) == "STDOUT" {
+		s.StderrDest = "STDOUT"
+	} else {
+		s.StderrDest = stderrDest
+	}
 
 	if values, ok := GetMapItem(data, "env"); ok {
 		AssertIsMap("env", values)

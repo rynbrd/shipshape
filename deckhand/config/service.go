@@ -92,8 +92,13 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 func (s Service) Validate() []error {
 	errors := make([]error, 0, 10)
 
-	if len(s.Command) == 0 || strings.TrimSpace(s.Command[0]) == "" {
+	if len(s.Command) == 0 {
 		msg := fmt.Sprintf("command is invalid: %+v", s.Command)
+		errors = append(errors, ValidationError(msg))
+	}
+
+	if _, err := exec.LookupPath(s.Command[0]); err != nil {
+		msg := fmt.Sprintf("command not found: %+v", s.Command)
 		errors = append(errors, ValidationError(msg))
 	}
 

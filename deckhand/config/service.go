@@ -43,7 +43,7 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 	s.Retries = GetInt(data, "retries", DefaultServiceRetries)
 
 	stderrDest := GetString(data, "stderr-dest", DefaultServiceStderrDest)
-	if strings.Trim(strings.ToUpper(stderrDest)) == "STDOUT" {
+	if strings.TrimSpace(strings.ToUpper(stderrDest)) == "STDOUT" {
 		s.StderrDest = "STDOUT"
 	} else {
 		s.StderrDest = stderrDest

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 	"time"
@@ -95,7 +96,7 @@ func (s Service) Validate() []error {
 		errors = append(errors, ValidationError(msg))
 	}
 
-	if _, err := exec.LookupPath(s.Command[0]); err != nil {
+	if _, err := exec.LookPath(s.Command[0]); err != nil {
 		msg := fmt.Sprintf("command not found: %+v", s.Command)
 		errors = append(errors, ValidationError(msg))
 	}

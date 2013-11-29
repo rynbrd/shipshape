@@ -22,7 +22,6 @@ type Service struct {
 	StderrDest  string
 	Restart     bool
 	Retries     int
-	ExitStatus  int
 }
 
 // SetYAML parses the YAML tree into the configuration object.
@@ -41,7 +40,6 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 	s.StdoutDest = GetString(data, "stdout-dest", DefaultServiceStdoutDest)
 	s.Restart = GetBool(data, "restart", DefaultServiceRestart)
 	s.Retries = GetInt(data, "retries", DefaultServiceRetries)
-	s.ExitStatus = GetInt(data, "exit-status", DefaultServiceExitCode)
 
 	stderrDest := GetString(data, "stderr-dest", DefaultServiceStderrDest)
 	if strings.Trim(strings.ToUpper(stderrDest)) == "STDOUT" {
@@ -124,11 +122,6 @@ func (s Service) Validate() []error {
 
 	if s.Retries < 0 {
 		msg := fmt.Sprintf("retries must be n >= 0: %d", s.Retries)
-		errors = append(errors, ValidationError(msg))
-	}
-
-	if s.ExitStatus < 0 || s.ExitStatus > 255 {
-		msg := fmt.Sprintf("exit-code must be 0 <= n <= 255: %d", s.Retries)
 		errors = append(errors, ValidationError(msg))
 	}
 

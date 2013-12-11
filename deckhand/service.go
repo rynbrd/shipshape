@@ -4,6 +4,7 @@ import (
 	"./config"
 	"fmt"
 	"github.com/BlueDragonX/go-service/service"
+	"io"
 	"os"
 	"text/template"
 )
@@ -95,6 +96,21 @@ func (s Service) Name() string {
 // Ports returns the ports this service exposes.
 func (s Service) Ports() []config.Port {
 	return s.config.Ports
+}
+
+// Close frees resources associated with the service.
+func (s Service) Close() (err error) {
+	if closer, ok := s.Stdout.(io.Closer); ok {
+		if err = closer.Close(); err != nil {
+			return
+		}
+	}
+	if closer, ok := s.Stderr.(io.Closer); ok {
+		if err = closer.Close(); err != nil {
+			return
+		}
+	}
+	return
 }
 
 // RenderTemplates generates config files from the service templates.

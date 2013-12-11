@@ -4,25 +4,24 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 )
 
 type Service struct {
-	Name        string
-	Command     []string
-	Ports       []Port
-	Templates   []Template
-	Dir         string
-	Env         map[string]string
-	Metadata    map[interface{}]interface{}
-	StopSignal  syscall.Signal
-	StopTimeout time.Duration
-	StdoutDest  string
-	StderrDest  string
-	Restart     bool
-	Retries     int
+	Name         string
+	Command      []string
+	Ports        []Port
+	Templates    []Template
+	Directory    string
+	Environment  map[string]string
+	StartTimeout time.Duration
+	StartRetries int
+	StopSignal   syscall.Signal
+	StopTimeout  time.Duration
+	StopRestart  bool
+	Stdout       string
+	Stderr       string
 }
 
 // SetYAML parses the YAML tree into the configuration object.
@@ -35,32 +34,20 @@ func (s *Service) SetYAML(tag string, data interface{}) bool {
 	AssertIsMap("service", data)
 	AssertHasKeys(data, []string{"command"}, "service")
 	s.Command = GetStringArray(data, "command", nil)
-	s.Dir = GetString(data, "dir", cwd)
+	s.Directory = GetString(data, "directory", cwd)
+	s.StartTimeout = GetDuration(data, "start-timeout", DefaultServiceStartTimeout)
+	s.StartRetries = GetInt(data, "start-retries", DefaultServiceStartRetries)
 	s.StopSignal = GetSignal(data, "stop-signal", DefaultServiceStopSignal)
 	s.StopTimeout = GetDuration(data, "stop-timeout", DefaultServiceStopTimeout)
-	s.StdoutDest = GetString(data, "stdout-dest", DefaultServiceStdoutDest)
-	s.Restart = GetBool(data, "restart", DefaultServiceRestart)
-	s.Retries = GetInt(data, "retries", DefaultServiceRetries)
+	s.StopRestart = GetBool(data, "stop-restart", DefaultServiceStopRestart)
+	s.Stdout = GetString(data, "stdout", DefaultServiceStdout)
+	s.Stderr = GetString(data, "stderr", DefaultServiceStderr)
 
-	stderrDest := GetString(data, "stderr-dest", DefaultServiceStderrDest)
-	if strings.TrimSpace(strings.ToUpper(stderrDest)) == "STDOUT" {
-		s.StderrDest = "STDOUT"
-	} else {
-		s.StderrDest = stderrDest
-	}
-
-	if values, ok := GetMapItem(data, "env"); ok {
-		AssertIsMap("env", values)
-		s.Metadata = values.(map[interface{}]interface{})
-	} else {
-		s.Metadata = make(map[interface{}]interface{})
-	}
-
-	s.Env = make(map[string]string)
-	if values, ok := GetMapItem(data, "env"); ok {
-		AssertIsStringMap("env", values)
+	s.Environment = make(map[string]string)
+	if values, ok := GetMapItem(data, "environment"); ok {
+		AssertIsStringMap("environment", values)
 		for name, value := range values.(map[interface{}]interface{}) {
-			s.Env[name.(string)] = value.(string)
+			s.Environment[name.(string)] = value.(string)
 		}
 	}
 
@@ -101,31 +88,6 @@ func (s Service) Validate() []error {
 		errors = append(errors, ValidationError(msg))
 	}
 
-	if s.StopTimeout < 0 {
-		msg := fmt.Sprintf("stop-timeout must be n >= 0: %d", s.StopTimeout)
-		errors = append(errors, ValidationError(msg))
-	}
-
-	validateDest := func(what string, path string) {
-		if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
-			msg := fmt.Sprintf("%s is not writable: %s", what, path)
-			errors = append(errors, ValidationError(msg))
-		} else if s.StdoutDest != "/dev/null" && !fi.Mode().IsRegular() {
-			msg := fmt.Sprintf("%s must be a regular file or /dev/null: %s", what, path)
-			errors = append(errors, ValidationError(msg))
-		}
-	}
-
-	validateDest("stdout-dest", s.StdoutDest)
-	if s.StderrDest != "stdout" {
-		validateDest("stderr-dest", s.StderrDest)
-	}
-
-	if s.Retries < 0 {
-		msg := fmt.Sprintf("retries must be n >= 0: %d", s.Retries)
-		errors = append(errors, ValidationError(msg))
-	}
-
 	validateItem := func(item Validater) {
 		newErrors := item.Validate()
 		if len(newErrors) > 0 {
@@ -139,6 +101,41 @@ func (s Service) Validate() []error {
 
 	for _, template := range s.Templates {
 		validateItem(template)
+	}
+
+	validateTimeout := func(what string, t time.Duration) {
+		if t < 0*time.Second {
+			msg := fmt.Sprintf("%s must be n >= 0s: %s", what, t)
+			errors = append(errors, ValidationError(msg))
+		}
+	}
+
+	validateTimeout("start-timeout", s.StartTimeout)
+	validateTimeout("stop-timeout", s.StopTimeout)
+
+	if s.StartRetries < 0 {
+		msg := fmt.Sprintf("start-retries must be n >= 0: %d", s.StartRetries)
+		errors = append(errors, ValidationError(msg))
+	}
+
+	validateDest := func(what string, path string) {
+		if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
+			msg := fmt.Sprintf("%s is not writable: %s", what, path)
+			errors = append(errors, ValidationError(msg))
+		} else if s.Stdout != "/dev/null" && !fi.Mode().IsRegular() {
+			msg := fmt.Sprintf("%s must be a regular file or /dev/null: %s", what, path)
+			errors = append(errors, ValidationError(msg))
+		}
+	}
+
+	validateDest("stdout", s.Stdout)
+	if s.Stderr != "stdout" {
+		validateDest("stderr", s.Stderr)
+	}
+
+	if s.StartRetries < 0 {
+		msg := fmt.Sprintf("start-retries must be n >= 0: %d", s.StartRetries)
+		errors = append(errors, ValidationError(msg))
 	}
 
 	return errors

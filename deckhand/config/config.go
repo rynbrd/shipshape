@@ -8,15 +8,16 @@ import (
 )
 
 const (
-	DefaultSystemEventsEnable = true
-	DefaultSystemEventsUrl    = "http://%s:9001/event"
-	DefaultServiceStopSignal  = syscall.SIGTERM
-	DefaultServiceStopTimeout = 5 * time.Second
-	DefaultServiceStdoutDest  = "/dev/null"
-	DefaultServiceStderrDest  = "stdout"
-	DefaultServiceRestart     = true
-	DefaultServiceRetries     = 3
-	DefaultServiceExitCode    = 0
+	DefaultSystemEventsEnable  = true
+	DefaultSystemEventsUrl     = "http://%s:9001/event"
+	DefaultServiceStartTimeout = 1 * time.Second
+	DefaultServiceStartRetries = 3
+	DefaultServiceStopSignal   = syscall.SIGTERM
+	DefaultServiceStopTimeout  = 5 * time.Second
+	DefaultServiceStopRestart  = true
+	DefaultServiceStdout       = "/dev/null"
+	DefaultServiceStderr       = "stdout"
+	DefaultServiceExitCode     = 0
 )
 
 // Validator exposes validation on a configuration object.

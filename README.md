@@ -12,4 +12,4 @@ The following features are proposed:
 
 License
 -------
-Shipshape is licensed under GPLv2. See LICENSE for a copy of the licensea copy of the license.
+Shipshape is licensed under GPLv3. See LICENSE for a copy of the license.

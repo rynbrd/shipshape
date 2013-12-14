@@ -4,19 +4,21 @@ import (
 	"./config"
 	"fmt"
 	"github.com/BlueDragonX/go-service/service"
-	"io"
 	"os"
 	"text/template"
 )
 
 type Service struct {
+	Commands chan service.Command
 	Metadata map[string]string
 	config   *config.Service
+	stdout   *os.File
+	stderr   *os.File
 	*service.Service
 }
 
 // NewService creates a new service with the provided configuration.
-func NewService(cfg *config.Service) (s *Service, err error) {
+func NewService(cfg *config.Service, events chan<- service.Event) (s *Service, err error) {
 	env := make([]string, 0, len(cfg.Environment))
 	for key, value := range cfg.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
@@ -26,11 +28,11 @@ func NewService(cfg *config.Service) (s *Service, err error) {
 
 	defer func() {
 		if err != nil {
+			if stderr != stdout && stderr != nil {
+				stderr.Close()
+			}
 			if stdout != nil {
 				stdout.Close()
-			}
-			if stderr != nil {
-				stderr.Close()
 			}
 		}
 	}()
@@ -56,9 +58,16 @@ func NewService(cfg *config.Service) (s *Service, err error) {
 		}
 	}
 
-	s = &Service{make(map[string]string), cfg, nil}
-	s.Service, err = service.NewService(cfg.Command)
-	if err != nil {
+	s = &Service{
+		make(chan service.Command, CommandQueueSize),
+		make(map[string]string),
+		cfg,
+		stdout,
+		stderr,
+		nil,
+	}
+
+	if s.Service, err = service.NewService(cfg.Command); err != nil {
 		return
 	}
 
@@ -85,6 +94,8 @@ func NewService(cfg *config.Service) (s *Service, err error) {
 		}
 		return
 	}
+
+	go s.Service.Run(s.Commands, events)
 	return
 }
 
@@ -100,15 +111,15 @@ func (s Service) Ports() []config.Port {
 
 // Close frees resources associated with the service.
 func (s Service) Close() (err error) {
-	if closer, ok := s.Stdout.(io.Closer); ok {
-		if err = closer.Close(); err != nil {
+	close(s.Commands)
+
+	if s.stderr != nil && s.stderr != s.stdout {
+		if err = s.stderr.Close(); err != nil {
 			return
 		}
 	}
-	if closer, ok := s.Stderr.(io.Closer); ok {
-		if err = closer.Close(); err != nil {
-			return
-		}
+	if s.stdout != nil {
+		err = s.stdout.Close()
 	}
 	return
 }

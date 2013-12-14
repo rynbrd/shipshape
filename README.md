@@ -20,4 +20,4 @@ Deckhand runs in each container and is responsible for configuring, running, and
 
 License
 -------
-Shipshape is licensed under GPLv2. See LICENSE for a copy of the licensea copy of the license.
+Shipshape is licensed under GPLv3. See LICENSE for a copy of the license.
